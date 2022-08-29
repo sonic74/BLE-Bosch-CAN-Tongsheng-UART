@@ -5,8 +5,6 @@
  *
  * Copyright 2021-2022 Sven Killig (sven@killig.de)
  * http://sven.killig.de/Bosch/CANSender/
- * Licensed under the CC-BY-NC 4.0 license
- * (https://creativecommons.org/licenses/by-nc/4.0/).
  */
 
 // https://github.com/adafruit/arduino-CAN
