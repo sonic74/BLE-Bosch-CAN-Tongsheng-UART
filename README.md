@@ -1,5 +1,5 @@
 # BLE-Bosch-CAN-Tongsheng-UART
-Bosch CAN PowerPack activation and Bosch &amp; Tongsheng TSDZ2 Garmin compatible Bluetooth LE Cycling Power Profile
+Bosch CAN PowerPack activation and Bosch &amp; 同盛 Tongsheng TSDZ2 Garmin compatible Bluetooth LE Cycling Power Profile
 
 ![demo](https://cdn.discordapp.com/attachments/685285058176876575/999082098386288780/unknown.png)
 
