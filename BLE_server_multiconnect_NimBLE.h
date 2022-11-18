@@ -61,6 +61,7 @@ void initialize() {
 
 BLEServer* pServer = NULL;
 BLECharacteristic* pCharacteristic = NULL;
+BLECharacteristic* pCharacteristicBatteryLevel = NULL;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 
@@ -112,14 +113,14 @@ void setup_BLE_server_multiconnect_NimBLE() {
 
   initialize();
 
-  BLEDevice::init("同盛");
+  if(ATOMCANBusKit) BLEDevice::init("同盛");
+  else BLEDevice::init("Bosch");
 
   // Create the BLE Server
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
 
   BLEService *pService = pServer->createService(BLEUUID(/*(uint16_t)ESP_GATT_UUID_CYCLING_POWER_SVC*/CYCLING_POWER_SERVICE_UUID));
-
   pCharacteristic = pService->createCharacteristic(BLEUUID(CYCLING_POWER_MEASUREMENT_CHAR_UUID), NIMBLE_PROPERTY::NOTIFY);
 //  pCharacteristic->setCallbacks(new MyCharCallbacks());
   
@@ -145,6 +146,15 @@ void setup_BLE_server_multiconnect_NimBLE() {
   // Start advertising
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
   pAdvertising->addServiceUUID(BLEUUID(CYCLING_POWER_SERVICE_UUID));
+
+  uint16_t BATTERY_SERVICE_UUID = (uint16_t)0x180F;
+  BLEService *pServiceBattery = pServer->createService(BLEUUID(BATTERY_SERVICE_UUID));
+  pCharacteristicBatteryLevel = pServiceBattery->createCharacteristic((uint16_t)0x2A19, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  /*uint8_t pCharBatteryLevelValue;
+  pCharacteristicBatteryLevel->setValue(&pCharBatteryLevelValue, sizeof(pCharBatteryLevelValue));*/
+  pServiceBattery->start();
+  pAdvertising->addServiceUUID(BLEUUID(BATTERY_SERVICE_UUID));
+
 //  pAdvertising->setScanResponse(false);
 //#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(500, UNIT_1_25_MS)            /**< Minimum acceptable connection interval (0.5 seconds). */
 //#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(1000, UNIT_1_25_MS)           /**< Maximum acceptable connection interval (1 second). */
@@ -181,6 +191,10 @@ void loop_BLE_server_multiconnect_NimBLE() {
         CPSMeasurement.crank_rev_timestamp=last_crank_rev_timestamp;        
         pCharacteristic->setValue(reinterpret_cast<uint8_t*>(&CPSMeasurement), sizeof(CPSMeasurement));
         pCharacteristic->notify();
+        
+        if(ATOMCANBusKit) pCharacteristicBatteryLevel->setValue((uint8_t)batteryLevel);
+        else pCharacteristicBatteryLevel->setValue((uint8_t)batteryLevel); // todo map()
+        pCharacteristicBatteryLevel->notify();
         //delay(1000); // bluetooth stack will go into congestion, if too many packets are sent, in 6 hours test i was able to go as low as 3ms
     }
     // disconnecting

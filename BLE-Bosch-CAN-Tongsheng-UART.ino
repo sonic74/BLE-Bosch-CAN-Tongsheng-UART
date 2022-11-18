@@ -16,7 +16,6 @@ bool ATOMCANBusKit=false;
 
 bool tx = false;
 
-int DoD, SoC;
 int16_t current, power, voltage;
 int temperature = 27315;
 
@@ -171,7 +170,7 @@ void loop() {
     //    snprintf(zk, sizeof(zk), "%i %% | %.2f \u2103 | %.1f W | %.2f V | %.3f A", SoC, (float)(temperature-27315)/100.0f+.005f, (float)power/10.0f+.05f, (float)voltage/1000.0f+.005f, (float)current/1000.0f+.0005f);
     // %02x
     //    snprintf(zk, sizeof(zk), "%i %% | %.2f \u2103 | %.1f W (= %.2f V × %.3f A) %i %i %i %i", SoC, (float)(temperature-27315)/100.0f, (float)power/10.0f, (float)voltage/1000.0f, (float)current/1000.0f, torqueTara, torqueActual, speedSensor, motorControl);
-    snprintf(zk, sizeof(zk), "%i %% | %.2f C | %.1f W (= %.2f V x %.3f A) %i Nm %i rpm %i ms %i %i W", SoC, (float)(temperature - 27315) / 100.0f, (float)power / 10.0f, (float)voltage / 1000.0f, (float)current / 1000.0f, torque/*Tara, torqueActual*/, cadence, speedSensor, motorControl, powerBio);
+    snprintf(zk, sizeof(zk), "%i %% | %.2f C | %.1f W (= %.2f V x %.3f A) %i Nm %i rpm %i ms %i %i W", batteryLevel, (float)(temperature - 27315) / 100.0f, (float)power / 10.0f, (float)voltage / 1000.0f, (float)current / 1000.0f, torque/*Tara, torqueActual*/, cadence, speedSensor, motorControl, powerBio);
 
 #if defined(BLE_server_multiconnect_NimBLE)
     unsigned long currentMillisBLE_server_multiconnect_NimBLE = millis();
@@ -237,6 +236,7 @@ if(ATOMCANBusKit) {
 #ifdef CANSender_Debug
   torque = random(78, 200);
   cadence = random(90);
+  batteryLevel = random(100);
 #if defined(BLE_server_multiconnect_NimBLE)
   update_new_rpm(cadence);
 #endif
@@ -304,8 +304,8 @@ void onReceive(int packetSize) {
 #endif
       break;
     case 0x111: // 100 ms
-      SoC = buffer[6];
-      if (SoC < 5) {
+      batteryLevel = buffer[6];
+      if (batteryLevel < 5) {
         lowVoltage++;
 #ifdef ARDUINO_M5Stack_ATOM
         color.setHSV(0, 255, 255 * 2 / 3);
