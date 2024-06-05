@@ -7,16 +7,26 @@
  * http://sven.killig.de/Bosch/CANSender/
  */
 
-// https://github.com/adafruit/arduino-CAN
+#define TWAI
+#ifdef TWAI
+// doesn't werk with ATOMCANBusKit, perhaps missing init like https://github.com/sandeepmistry/arduino-CAN/blob/master/src/ESP32SJA1000.cpp#L59 in https://github.com/espressif/esp-idf/blob/master/components/driver/twai/twai.c#L289
+#include "driver/twai.h"
+#else
+// doesn't build for ARDUINO_M5STACK_ATOMS3
+// https://github.com/sandeepmistry/arduino-CAN
 #include <CAN.h>
+#endif
 
-bool ATOMCANBusKit=false;
-//#define CANSender_Debug
+//bool ATOMCANBusKit=false;
+bool ATOMCANBusKit=true;
+#define CANSender_Debug
 // ################################################################################################################################
 
-bool tx = false;
+//bool tx = false;
+bool tx = true;
 
-int16_t current, power, voltage;
+int16_t current, power;
+uint16_t voltage;
 int temperature = 27315;
 
 unsigned char batteryLevel, motorStatus, /*torqueTara, torqueActual*/ cadence, errorCode;
@@ -28,10 +38,15 @@ int16_t powerBio;
 
 unsigned char motorControl;
 
+// undefined behaviour
 union bytes2int_t {
   uint8_t myBytes[2];
   int16_t myInt;
 } bytes2int;
+union bytes2uint_t {
+  uint8_t myBytes[2];
+  uint16_t myUint;
+} bytes2uint;
 
 
 //#define CANSender_BLE
@@ -42,13 +57,35 @@ union bytes2int_t {
 #include "BLE_server_multiconnect_NimBLE.h"
 #endif
 
-#ifdef ARDUINO_TBeam
+#ifdef ARDUINO_M5STACK_ATOM
+#include "CANSender_M5Stack_ATOM.h"
+#endif
+
+#if defined(ARDUINO_M5STACK_Core2) || defined(ARDUINO_M5Stick_C_PLUS)
+// for CHSV
+#include <FastLED.h>
+#include "CANSender_M5Stack_Core2.h"
+#endif
+
+#if defined(ARDUINO_M5STACK_ATOMS3)
+// blocks if not read out
+//#define Serial USBSerial
+#include "CANSender_M5Stack_ATOMS3.h"
+#endif
+
+#if defined(ARDUINO_M5STACK_ATOM) || defined(ARDUINO_M5STACK_Core2) || defined(ARDUINO_M5Stick_C_PLUS) || defined(ARDUINO_M5STACK_ATOMS3)
+#define ARDUINO_M5Stack
+CHSV color = CHSV(0, 255, 255 * 2 / 3);
+#endif
+
+#if defined(ARDUINO_TBeam) || defined(ARDUINO_TBEAM_USE_RADIO_SX1262)
 #include "CANSender_TBeam.h"
 #endif
 
-#ifdef ARDUINO_M5Stack_ATOM
-#include "CANSender_M5Stack_ATOM.h"
-CHSV color = CHSV(0, 255, 255 * 2 / 3);
+#ifdef ARDUINO_ESP32S3_DEV
+#define ARDUINO_TEmbed
+// USB\VID_303A&PID_1001&MI_00\8&2BFFE741&0&0000
+#include "CANSender_TEmbed.h"
 #endif
 
 #include "OTAWebUpdater.h"
@@ -60,8 +97,9 @@ void setup() {
   Serial.begin(115200/*500E3 doesn't werk*/);
   while (!Serial);
   uint64_t efuseMac=ESP.getEfuseMac();
-  if(efuseMac==0x7C3EAC7EB994) {
+  if(efuseMac==0x7C3EAC7EB994 /*|| efuseMac==0x2C7CC77554DC*/) {
     ATOMCANBusKit=true;
+    Serial.println("ATOMCANBusKit");
 #if not defined(CANSender_Debug)
     tx = true;
 #endif
@@ -72,20 +110,32 @@ void setup() {
 #elif defined(BLE_server_multiconnect_NimBLE)
   setup_BLE_server_multiconnect_NimBLE();
 #endif
-#if defined(ARDUINO_TBeam) || defined(ARDUINO_M5Stack_ATOM)
-#ifdef ARDUINO_TBeam
+#if defined(ARDUINO_TBeam) || defined(ARDUINO_TBEAM_USE_RADIO_SX1262) || defined(ARDUINO_TEmbed) || defined(ARDUINO_M5Stack)
+#if defined(ARDUINO_TBeam) || defined(ARDUINO_TBEAM_USE_RADIO_SX1262)
   setup_TTBEAM();
 #endif
-#ifdef ARDUINO_M5Stack_ATOM
+#ifdef ARDUINO_TEmbed
+  setup_TEmbed();
+#endif
+#ifdef /*ARDUINO_M5Stack_ATOM*/ARDUINO_M5STACK_ATOM
   setup_M5Atom();
 #endif
-#else
-  CAN.setPins(rx, tx); // TODO define
-  int[] ids={0x101, 0x111, 0x2aa, 0x048, 0x0d2}
-  int idsAND=0;
-  for(int i=0; i<sizeof(ids); i++) idsAND &= ids[i];
-  CAN.filter(idsAND, ~idsAND);
+#if defined(ARDUINO_M5STACK_Core2) || defined(ARDUINO_M5Stick_C_PLUS)
+  setup_M5Core2();
 #endif
+#if defined(/*ARDUINO_M5Stack_ATOMS3*//*ARDUINO_m5stack_atoms3*/ARDUINO_M5STACK_ATOMS3)
+  setup_M5AtomS3();
+#endif
+#else // defined(ARDUINO_TBeam) || defined(ARDUINO_TEmbed) || defined(ARDUINO_M5Stack)
+  CAN.setPins(rx, tx); // TODO define
+/*  int[] ids={0x101, 0x111, 0x2aa, 0x048, 0x0d2}
+  int idsAND=0;
+  for(int i=0; i<sizeof(ids); i++) idsAND &= ids[i]; // TODO?
+#ifdef CANSender_Debug
+  Serial.print("idsAND=0b"); Serial.print(idsAND, BIN); 
+#endif
+  CAN.filter(idsAND, ~idsAND);*/
+#endif // defined(ARDUINO_TBeam) || defined(ARDUINO_TEmbed) || defined(ARDUINO_M5Stack)
 
 #ifdef CANSender_Debug
   Serial.print("efuseMac="); Serial.println(efuseMac, HEX);
@@ -103,6 +153,40 @@ void setup() {
 #endif
 
   // start the CAN bus at 500 kbps
+#ifdef TWAI
+  // Initialize configuration structures using macro initializers
+  twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)TX_PIN, (gpio_num_t)RX_PIN, TWAI_MODE_NORMAL/*TWAI_MODE_NO_ACK*/);
+  twai_timing_config_t t_config = TWAI_TIMING_CONFIG_500KBITS();  //Look in the api-reference for other speed sets.
+  twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL()/*{.acceptance_code = (0x111 << 21),.acceptance_mask = ~(0x7FF << 21),.single_filter = true}*/;
+
+  // Install TWAI driver
+  if (twai_driver_install(&g_config, &t_config, &f_config) == ESP_OK) {
+    Serial.println("Driver installed");
+  } else {
+    Serial.println("Failed to install driver");
+    return;
+  }
+
+  // Start TWAI driver
+  if (twai_start() == ESP_OK) {
+    Serial.println("Driver started");
+  } else {
+    Serial.println("Failed to start driver");
+    return;
+  }
+
+#ifdef CANSender_Debug
+  // Reconfigure alerts to detect frame receive, Bus-Off error and RX queue full states
+  uint32_t alerts_to_enable = TWAI_ALERT_RX_DATA | TWAI_ALERT_ERR_PASS | TWAI_ALERT_BUS_ERROR | TWAI_ALERT_RX_QUEUE_FULL | TWAI_ALERT_BUS_OFF | TWAI_ALERT_TX_FAILED;
+#else
+  uint32_t alerts_to_enable = TWAI_ALERT_RX_DATA;
+#endif
+  if (twai_reconfigure_alerts(alerts_to_enable, NULL) == ESP_OK) {
+    Serial.println("CAN Alerts reconfigured");
+  } else {
+    Serial.println("Failed to reconfigure alerts");
+  }
+#else
   if (!CAN.begin(500E3)) {
     Serial.println("Starting CAN failed!");
     while (1);
@@ -110,6 +194,7 @@ void setup() {
 
   // register the receive callback
   CAN.onReceive(onReceive);
+#endif
   Serial.println("% % | °C °C | W W (= V V x A A) Nm Nm rpm rpm ms ms motorControl W W");
 }
 
@@ -124,6 +209,7 @@ unsigned char checksumLCD, sumLCD;
 
 unsigned long previousMillis = 0;
 int interval = 200;
+bool tx_cycle;
 
 unsigned long previousMillisBLE = 0;
 #ifdef CANSender_BLE
@@ -138,20 +224,80 @@ constexpr size_t intervalBLE_server_multiconnect_NimBLE = 1 * 1000;
 #endif
 
 bool ota = false;
+uint32_t lastChangeFor;
 void loop() {
+#ifdef TWAI
+  // Check if alert happened
+  uint32_t alerts_triggered;
+  twai_read_alerts(&alerts_triggered, 1);
+  twai_status_info_t twaistatus;
+  twai_get_status_info(&twaistatus);
+
+  // Handle alerts
+  if (alerts_triggered & TWAI_ALERT_ERR_PASS) {
+    Serial.println("Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: TWAI controller has become error passive.");
+  }
+  if (alerts_triggered & TWAI_ALERT_BUS_OFF) {
+    Serial.println("Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: TWAI_ALERT_BUS_OFF");
+  }
+  if (alerts_triggered & TWAI_ALERT_TX_FAILED) {
+    Serial.println("Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: TWAI_ALERT_TX_FAILED");
+  }
+  if (alerts_triggered & TWAI_ALERT_BUS_ERROR) {
+    Serial.println("Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: A (Bit, Stuff, CRC, Form, ACK) error has occurred on the bus.");
+    Serial.printf("Bus error count: %d\n", twaistatus.bus_error_count);
+  }
+  if (alerts_triggered & TWAI_ALERT_RX_QUEUE_FULL) {
+    Serial.println("Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: The RX queue is full causing a received frame to be lost.");
+    Serial.printf("RX buffered: %d\t", twaistatus.msgs_to_rx);
+    Serial.printf("RX missed: %d\t", twaistatus.rx_missed_count);
+    Serial.printf("RX overrun %d\n", twaistatus.rx_overrun_count);
+  }
+
+  // Check if message is received
+  if (alerts_triggered & TWAI_ALERT_RX_DATA) {
+    // One or more messages received. Handle all.
+    onReceive(-1);
+  }
+#endif
+
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     if (tx) {
       // send packet: id is 11 bits, packet can contain up to 8 bytes of data
+#ifdef TWAI
+      /*leds[1] = CRGB::Black;
+      FastLED.show();*/
+#ifdef CANSender_Debug
+      Serial.printf("twai_state_t:%i\n", twaistatus.state);
+#endif
+      //Configure message to transmit
+      twai_message_t message;
+      message.identifier = 0x09A;
+      message.extd = 0;
+      message.data_length_code = 1;
+      message.data[0]=0;      
+      if (twai_transmit(&message, pdMS_TO_TICKS(1000)) == ESP_OK) {
+#ifdef ARDUINO_TEmbed
+        leds[1] = tx_cycle ? CRGB::Red : CRGB::Blue;
+        tx_cycle=!tx_cycle;
+        FastLED.show();
+#endif
+      } else {
+        Serial.println("Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Failed to queue message for transmission!");
+      }
+#else//def TWAI
       CAN.beginPacket(0x09A);
       CAN.write(0);
       CAN.endPacket();
-#ifdef ARDUINO_M5Stack_ATOM
-      color.setHSV(map(0x09A, 0, 0x2aa, 0, 255), 255, 255 * 2 / 3);
+#ifdef CANSender_Debug
+      Serial.println("CAN.endPacket()");
 #endif
+#endif
+#ifdef ARDUINO_M5Stack
+      color.setHSV(map(0x09A, 0, 0x2aa, 0, 255), 255, 255 * 2 / 3);
     } else {
-#ifdef ARDUINO_M5Stack_ATOM
       color.setHSV(0, 0, 0);
 #endif
     }
@@ -180,11 +326,13 @@ void loop() {
     }
 #endif
 #endif
+//#ifndef ARDUINO_TEmbed
     Serial.println(zk);
+//#endif
   }
 
   unsigned char inByte;
-#ifdef ARDUINO_M5Stack_ATOM
+#ifdef ARDUINO_M5Stack
 if(ATOMCANBusKit) {
   if (Serial2.available()) {
     // Tongsheng motor
@@ -231,47 +379,116 @@ if(ATOMCANBusKit) {
     }
   }
 }
-#endif
+#endif // ARDUINO_M5Stack
 
 #ifdef CANSender_Debug
-  torque = random(78, 200);
-  cadence = random(90);
+  /*torque*/powerBio = random(78, 200);
+  cadence = random(1, 90);
   batteryLevel = random(100);
 #if defined(BLE_server_multiconnect_NimBLE)
   update_new_rpm(cadence);
 #endif
 #endif
 
-#ifdef ARDUINO_TBeam
+#if defined(ARDUINO_TBeam) || defined(ARDUINO_TBEAM_USE_RADIO_SX1262)
   loop_TTBEAM();
 #endif
-#ifdef ARDUINO_M5Stack_ATOM
+#ifdef ARDUINO_TEmbed
+  loop_TEmbed();
+#endif
+#if defined(ARDUINO_M5STACK_Core2) || defined(ARDUINO_M5Stick_C_PLUS)
+  loop_M5Core2();
+#endif
+#if defined(ARDUINO_M5STACK_ATOMS3)
+  loop_M5AtomS3();
+#endif
+#if defined(ARDUINO_M5STACK_Core2) || defined(ARDUINO_M5Stick_C_PLUS) || defined(ARDUINO_M5STACK_ATOMS3)
+  // circular dependency!
+  lastChangeFor=millis()-M5.BtnA.lastChange();
   M5.update();
-  if (M5.Btn.wasPressed()) {
+  if (wasPressed()) {
 #ifdef CANSender_Debug
     Serial.println("Pressed");
 #endif
-    //tx=!tx;
-    tx=false;
-    CAN.end();
-    setup_OTAWebUpdater();
-    ota = true;
+    if(lastChangeFor>1500) {
+/*      tx=!tx;*/
+      switch(currentScreen) {
+        case SCREEN_TX:
+          tx=!tx;
+          break;
+        case SCREEN_OTA:
+          setup_OTAWebUpdater();
+          ota = true;
+          break;
+      }
+    } else {
+/*      tx=false;
+#ifdef TWAI
+      twai_stop();
+#else
+      CAN.end();
+#endif
+      setup_OTAWebUpdater();
+      ota = true;*/
+      M5.Lcd.clear(BLACK);
+      currentScreen=static_cast<SCREEN>((currentScreen+1)%(ENUM_LAST));
+    }
   }
   /*color=!color;
     if(color && tx) M5.dis.drawpix(0, CHSV(0x09A,255,255));
     else M5.dis.clear();*/
-  M5.dis.drawpix(0, color);
+  drawpix(0, color);
   if (ota) loop_OTAWebUpdater();
-#endif
+#endif // defined(ARDUINO_M5STACK_Core2) || defined(ARDUINO_M5Stick_C_PLUS) || defined(ARDUINO_M5STACK_ATOMS3)
 }
+
 
 // IRAM_ATTR ? 
 void onReceive(int packetSize) {
   // Bosch
   uint8_t buffer[8];
+  int packetId;
+#ifdef TWAI
+  twai_message_t message;
+while/*if*/ (twai_receive(&message, /*0*/pdMS_TO_TICKS(1)) == ESP_OK) {
+    if(message.extd || message.rtr) {
+      Serial.println("message.extd || message.rtr");
+      return;
+    }
+    packetId=message.identifier;
+    packetSize=message.data_length_code;
+    //*buffer=*(message.data);
+    //for(int i=0; i<packetSize; i++) buffer[i]=message.data[i];
+    memcpy(buffer, message.data, packetSize);
+
+    /*if(packetId==0x101 || packetId==0x111 || packetId==0x2aa) {
+    Serial.print("packetId=0x");
+    Serial.println(packetId, HEX);
+    Serial.print("packetSize=");
+    Serial.println(packetSize);
+    Serial.print("message.data[");
+    for(int i=0; i<packetSize; i++) {
+      Serial.print(i);
+      Serial.print("]=0x");
+      Serial.print(message.data[i], HEX);
+      Serial.print(" ");
+    }
+    Serial.println();
+    Serial.print("buffer[");
+    for(int i=0; i<packetSize; i++) {
+      Serial.print(i);
+      Serial.print("]=0x");
+      Serial.print(buffer[i], HEX);
+      Serial.print(" ");
+      buffer[i]=message.data[i];
+    }
+    Serial.println();
+    }*/
+#else
   CAN.readBytes(buffer, packetSize);
-  int packetId=CAN.packetId();
-#ifdef ARDUINO_M5Stack_ATOM
+  packetId=CAN.packetId();
+#endif
+#ifdef ARDUINO_M5Stack
 //  if (CAN.packetId() != 0x0E1 && CAN.packetId() != 0x0f1) color.setHSV(map(CAN.packetId(), 0, 0x2aa, 0, 255), 255, 255 * 2 / 3);
 #endif
   switch (packetId) {
@@ -287,7 +504,10 @@ void onReceive(int packetSize) {
       bytes2int.myBytes[0] = buffer[3];
       current = bytes2int.myInt;
       power = 256 * buffer[4] + buffer[5];
-      voltage = 256 * buffer[6] + buffer[7];
+      bytes2uint.myBytes[1] = buffer[6];
+      bytes2uint.myBytes[0] = buffer[7];
+      //voltage = 256 * buffer[6] + buffer[7];
+      voltage = bytes2uint.myUint;
       /*if(voltage<30*1000) {
         lowVoltage++;
         color.setHSV(0,255,255*2/3);
@@ -299,7 +519,7 @@ void onReceive(int packetSize) {
         lowVoltage=0;
         }*/
       //      color=CHSV(0x101-2,255,255/2);
-#ifdef ARDUINO_M5Stack_ATOM
+#ifdef ARDUINO_M5Stack
   color.setHSV(map(packetId, 0, 0x2aa, 0, 255), 255, 255 * 2 / 3);
 #endif
       break;
@@ -307,10 +527,16 @@ void onReceive(int packetSize) {
       batteryLevel = buffer[6];
       if (batteryLevel < 5) {
         lowVoltage++;
-#ifdef ARDUINO_M5Stack_ATOM
+#ifdef ARDUINO_M5Stack
         color.setHSV(0, 255, 255 * 2 / 3);
 #endif
-        if (lowVoltage > 100) {
+        if (lowVoltage > 100*10) {
+#ifdef CANSender_Debug
+          Serial.println("lowVoltage > 1000 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+#endif
+#ifdef ARDUINO_M5STACK_Core2
+          M5.Spk.DingDong();
+#endif
           tx = false;
           lowVoltage = 0;
         }
@@ -318,14 +544,14 @@ void onReceive(int packetSize) {
         lowVoltage = 0;
       }
       //      color=CHSV((uint8_t)CAN.packetId(),255,255/2);
-#ifdef ARDUINO_M5Stack_ATOM
+#ifdef ARDUINO_M5Stack
   color.setHSV(map(packetId, 0, 0x2aa, 0, 255), 255, 255 * 2 / 3);
 #endif
       break;
     case 0x2aa: // 500 ms
       temperature = 256 * buffer[0] + buffer[1];
       //      color=CHSV((uint8_t)CAN.packetId(),255,255/2);
-#ifdef ARDUINO_M5Stack_ATOM
+#ifdef ARDUINO_M5Stack
   color.setHSV(map(packetId, 0, 0x2aa, 0, 255), 255, 255 * 2 / 3);
 #endif
       break;
@@ -355,14 +581,17 @@ void onReceive(int packetSize) {
       // moved because LoadProhibited and Stack smashing protect failure
       //update_new_rpm(cadence);
 #endif
-#ifdef ARDUINO_M5Stack_ATOM
+#ifdef ARDUINO_M5Stack
   color.setHSV(map(packetId, 0, 0x2aa, 0, 255), 255, 255 * 2 / 3);
 #endif
       break;
 #ifdef CANSender_Debug
-    default:
+/*    default:
       Serial.print(" 0x"); Serial.print(packetId, HEX); Serial.print(" ");
-      break;
+      break;*/
 #endif
   }
+#ifdef TWAI
+}
+#endif
 }

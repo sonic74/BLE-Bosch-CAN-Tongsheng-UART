@@ -1,5 +1,6 @@
 // Bluedroid is incompatible with Garmin
 #include <NimBLEDevice.h>
+#include <nimble/nimble/host/services/bas/include/services/bas/ble_svc_bas.h>
 
 // https://github.com/ihaque/pelomon/blob/main/pelomon/ble_constants.h
 #include "ble_constants.h"
@@ -147,9 +148,9 @@ void setup_BLE_server_multiconnect_NimBLE() {
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
   pAdvertising->addServiceUUID(BLEUUID(CYCLING_POWER_SERVICE_UUID));
 
-  uint16_t BATTERY_SERVICE_UUID = (uint16_t)0x180F;
+  uint16_t BATTERY_SERVICE_UUID = (uint16_t)/*0x180F*/BLE_SVC_BAS_UUID16;
   BLEService *pServiceBattery = pServer->createService(BLEUUID(BATTERY_SERVICE_UUID));
-  pCharacteristicBatteryLevel = pServiceBattery->createCharacteristic((uint16_t)0x2A19, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  pCharacteristicBatteryLevel = pServiceBattery->createCharacteristic((uint16_t)/*0x2A19*/BLE_SVC_BAS_CHR_UUID16_BATTERY_LEVEL, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   /*uint8_t pCharBatteryLevelValue;
   pCharacteristicBatteryLevel->setValue(&pCharBatteryLevelValue, sizeof(pCharBatteryLevelValue));*/
   pServiceBattery->start();

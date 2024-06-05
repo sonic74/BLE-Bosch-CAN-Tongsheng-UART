@@ -73,12 +73,12 @@ void setup_OTAWebUpdater(void) {
 #ifdef CANSender_Debug
     Serial.print(".");
 #endif
-#ifdef ARDUINO_M5Stack_ATOM
+#ifdef ARDUINO_M5Stack
     M5.update();
     flash=!flash;
     if(flash) color.setHSV(0,255,255*2/3);
     else color.setHSV(0,0,0);
-    M5.dis.drawpix(0, color);
+    drawpix(0, color);
 #endif
   }
 #ifdef CANSender_Debug
@@ -86,25 +86,38 @@ void setup_OTAWebUpdater(void) {
   Serial.print("Connected to "); Serial.println(WiFi.SSID());
   Serial.print("IP address: "); Serial.println(WiFi.localIP());
 #endif
+#if defined(ARDUINO_M5STACK_Core2) || defined(ARDUINO_M5Stick_C_PLUS) || defined(ARDUINO_M5Stack_ATOMS3)
+  M5.Lcd.clear(BLACK);
+  M5.Lcd.setTextColor(WHITE);
+  M5.Lcd.setCursor(0, FONT_HEIGHT);
+  M5.Lcd.println("Connected to "); M5.Lcd.println(WiFi.SSID());
+  M5.Lcd.println("IP address: "); M5.Lcd.println(WiFi.localIP());
+#endif
 
   /*use mdns for host name resolution*/
-  if (!MDNS.begin(host)) { //http://esp32.local
+  if (!MDNS.begin(host)) { // http://esp32.local
 #ifdef CANSender_Debug
     Serial.println("Error setting up MDNS responder!");
 #endif
+#if defined(ARDUINO_M5STACK_Core2) || defined(ARDUINO_M5Stick_C_PLUS) || defined(ARDUINO_M5Stack_ATOMS3)
+  M5.Lcd.println("Error setting up MDNS responder!");
+#endif
     while (1) {
       delay(1000);
-#ifdef ARDUINO_M5Stack_ATOM
+#ifdef ARDUINO_M5Stack
     M5.update();
     flash=!flash;
     if(flash) color.setHSV(0,255,255*2/3);
     else color.setHSV(0,0,0);
-    M5.dis.drawpix(0, color);
+    drawpix(0, color);
 #endif
     }
   }
 #ifdef CANSender_Debug
   Serial.println("mDNS responder started");
+#endif
+#if defined(ARDUINO_M5STACK_Core2) || defined(ARDUINO_M5Stick_C_PLUS) || defined(ARDUINO_M5Stack_ATOMS3)
+  M5.Lcd.println("mDNS responder started");
 #endif
   /*return index page which is stored in serverIndex */
   server.on("/", HTTP_GET, []() {
@@ -122,6 +135,9 @@ void setup_OTAWebUpdater(void) {
 #ifdef CANSender_Debug
       Serial.printf("Update: %s\n", upload.filename.c_str());
 #endif
+#if defined(ARDUINO_M5STACK_Core2) || defined(ARDUINO_M5Stick_C_PLUS) || defined(ARDUINO_M5Stack_ATOMS3)
+      M5.Lcd.printf("Update: %s\n", upload.filename.c_str());
+#endif
       if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
         Update.printError(Serial);
       }
@@ -134,6 +150,9 @@ void setup_OTAWebUpdater(void) {
       if (Update.end(true)) { //true to set the size to the current progress
 #ifdef CANSender_Debug
         Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+#endif
+#if defined(ARDUINO_M5STACK_Core2) || defined(ARDUINO_M5Stick_C_PLUS) || defined(ARDUINO_M5Stack_ATOMS3)
+        M5.Lcd.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
 #endif
       } else {
         Update.printError(Serial);

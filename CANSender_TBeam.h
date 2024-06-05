@@ -108,7 +108,12 @@ void setup_TTBEAM() {
   oled->display();
 
   // CRX, CTX
+#ifdef TWAI
+#define RX_PIN 4
+#define TX_PIN 15
+#else
   CAN.setPins(4, 15);
+#endif
 }
 
 void loop_TTBEAM() {
@@ -122,7 +127,7 @@ void loop_TTBEAM() {
   oled->drawString(0, 16, zk);
   sprintf(zk, "%.1f | %.1f W", (float)power/10.0f, battVoltage*battDischargeCurrent);
   oled->drawString(0, 32, zk);
-  sprintf(zk, "%.2f °C | %i %%", (float)(temperature-27315)/100.0f, SoC);
+  sprintf(zk, "%.2f °C | %i %%", (float)(temperature-27315)/100.0f, batteryLevel);
   oled->drawString(0, 48, zk);
   oled->display();
 }
