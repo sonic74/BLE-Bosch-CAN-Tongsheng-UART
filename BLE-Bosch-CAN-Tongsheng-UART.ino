@@ -7,7 +7,15 @@
  * http://sven.killig.de/Bosch/CANSender/
  */
 
+//bool ATOMCANBusKit=false;
+bool ATOMCANBusKit=true;
+#define CANSender_Debug
 #define TWAI
+//#define TONGSHENG
+//bool tx = false;
+bool tx = true;
+// ################################################################################################################################
+
 #ifdef TWAI
 #include "driver/twai.h"
 gpio_num_t RX_PIN=GPIO_NUM_NC, TX_PIN=GPIO_NUM_NC;
@@ -16,15 +24,6 @@ gpio_num_t RX_PIN=GPIO_NUM_NC, TX_PIN=GPIO_NUM_NC;
 // https://github.com/sandeepmistry/arduino-CAN
 #include <CAN.h>
 #endif
-
-//bool ATOMCANBusKit=false;
-bool ATOMCANBusKit=true;
-#define CANSender_Debug
-//#define TONGSHENG
-// ################################################################################################################################
-
-//bool tx = false;
-bool tx = true;
 
 int16_t current, power;
 uint16_t voltage;
@@ -91,8 +90,6 @@ CHSV color = CHSV(0, 255, 255 * 2 / 3);
 
 #include "OTAWebUpdater.h"
 
-
-int interval = 200;
 
 void setup() {
   //setCpuFrequencyMhz(160);
@@ -201,6 +198,7 @@ unsigned char checksumMotor, sumMotor;
 unsigned int startByteLCD;
 unsigned char checksumLCD, sumLCD;
 
+int interval = 200;
 unsigned long previousMillis = 0;
 bool tx_cycle;
 
