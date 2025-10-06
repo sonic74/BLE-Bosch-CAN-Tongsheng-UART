@@ -1,0 +1,6 @@
+/build
+/TEmbed
+*.svd
+*.bin
+*.json
+*.cfg

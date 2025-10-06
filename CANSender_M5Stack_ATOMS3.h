@@ -1,4 +1,7 @@
-#include <M5AtomS3.h>
+#include <M5Unified.h>
+// for CHSV
+#include <FastLED.h>
+
 
 // ToDo: yAdvance
 const int FONT_HEIGHT=0;
@@ -25,23 +28,26 @@ void drawpix(int led, CHSV color) {
 void setup_M5AtomS3() {
   Serial.setTxTimeoutMs(/*5*/50); // set USB CDC Time TX
 
-  M5.begin(/*true, true, false, false*/); // bool LCDEnable = true, bool SerialEnable = true, bool I2CEnable = true, bool LEDEnable = false
+  auto cfg = M5.config();
+  M5.begin(cfg);
+
   M5.Display.setBrightness(255);
   M5.Lcd.setTextFont(4); // 1/2..4, 3 not visible (?)
 if(ATOMCANBusKit) {
 #ifdef TWAI
-#define RX_PIN GPIO_NUM_6
-#define TX_PIN GPIO_NUM_5
-//pinMode(TX_PIN, OUTPUT);
-#else
+RX_PIN=gpio_num_t(6);
+TX_PIN=gpio_num_t(5);
+#else //TWAI
   CAN.setPins(GPIO_NUM_6, GPIO_NUM_5);
-#endif
+#endif //TWAI
+#ifdef TONGSHENG
   Serial2.begin(9600, SERIAL_8N1, /*1*/GPIO_NUM_1);
   Serial1.begin(9600, SERIAL_8N1, /*2*/GPIO_NUM_2);
+#endif
 } else {
 #ifdef TWAI
-#define RX_PIN GPIO_NUM_1
-#define TX_PIN GPIO_NUM_2
+RX_PIN=GPIO_NUM_1;
+TX_PIN=GPIO_NUM_2;
 #else
   CAN.setPins(GPIO_NUM_1, GPIO_NUM_2);
 #endif

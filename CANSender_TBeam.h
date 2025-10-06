@@ -109,8 +109,8 @@ void setup_TTBEAM() {
 
   // CRX, CTX
 #ifdef TWAI
-#define RX_PIN 4
-#define TX_PIN 15
+RX_PIN=4
+TX_PIN=15
 #else
   CAN.setPins(4, 15);
 #endif

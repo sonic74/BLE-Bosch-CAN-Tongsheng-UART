@@ -9,8 +9,8 @@
 
 #define TWAI
 #ifdef TWAI
-// doesn't werk with ATOMCANBusKit, perhaps missing init like https://github.com/sandeepmistry/arduino-CAN/blob/master/src/ESP32SJA1000.cpp#L59 in https://github.com/espressif/esp-idf/blob/master/components/driver/twai/twai.c#L289
 #include "driver/twai.h"
+gpio_num_t RX_PIN=GPIO_NUM_NC, TX_PIN=GPIO_NUM_NC;
 #else
 // doesn't build for ARDUINO_M5STACK_ATOMS3
 // https://github.com/sandeepmistry/arduino-CAN
@@ -20,6 +20,7 @@
 //bool ATOMCANBusKit=false;
 bool ATOMCANBusKit=true;
 #define CANSender_Debug
+//#define TONGSHENG
 // ################################################################################################################################
 
 //bool tx = false;
@@ -91,6 +92,8 @@ CHSV color = CHSV(0, 255, 255 * 2 / 3);
 #include "OTAWebUpdater.h"
 
 
+int interval = 200;
+
 void setup() {
   //setCpuFrequencyMhz(160);
 
@@ -99,7 +102,6 @@ void setup() {
   uint64_t efuseMac=ESP.getEfuseMac();
   if(efuseMac==0x7C3EAC7EB994 /*|| efuseMac==0x2C7CC77554DC*/) {
     ATOMCANBusKit=true;
-    Serial.println("ATOMCANBusKit");
 #if not defined(CANSender_Debug)
     tx = true;
 #endif
@@ -138,6 +140,7 @@ void setup() {
 #endif // defined(ARDUINO_TBeam) || defined(ARDUINO_TEmbed) || defined(ARDUINO_M5Stack)
 
 #ifdef CANSender_Debug
+  Serial.printf("ATOMCANBusKit=%i\n", ATOMCANBusKit);
   Serial.print("efuseMac="); Serial.println(efuseMac, HEX);
   uint32_t Freq = 0;
   Freq = getCpuFrequencyMhz();
@@ -154,38 +157,29 @@ void setup() {
 
   // start the CAN bus at 500 kbps
 #ifdef TWAI
+  Serial.printf("TX_PIN=%i, RX_PIN=%i\n", TX_PIN, RX_PIN);
   // Initialize configuration structures using macro initializers
-  twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)TX_PIN, (gpio_num_t)RX_PIN, TWAI_MODE_NORMAL/*TWAI_MODE_NO_ACK*/);
-  twai_timing_config_t t_config = TWAI_TIMING_CONFIG_500KBITS();  //Look in the api-reference for other speed sets.
+  twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(TX_PIN, RX_PIN, TWAI_MODE_NORMAL/*TWAI_MODE_NO_ACK*/);
+  twai_timing_config_t t_config = TWAI_TIMING_CONFIG_500KBITS();
   twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL()/*{.acceptance_code = (0x111 << 21),.acceptance_mask = ~(0x7FF << 21),.single_filter = true}*/;
 
   // Install TWAI driver
-  if (twai_driver_install(&g_config, &t_config, &f_config) == ESP_OK) {
-    Serial.println("Driver installed");
-  } else {
-    Serial.println("Failed to install driver");
-    return;
-  }
+  ESP_ERROR_CHECK(twai_driver_install(&g_config, &t_config, &f_config));
+  Serial.println("Driver installed");
 
   // Start TWAI driver
-  if (twai_start() == ESP_OK) {
-    Serial.println("Driver started");
-  } else {
-    Serial.println("Failed to start driver");
-    return;
-  }
+  ESP_ERROR_CHECK(twai_start());
+  Serial.println("Driver started");
+  gpio_dump_io_configuration(stdout, (1ULL << TX_PIN) | (1ULL << RX_PIN));
 
 #ifdef CANSender_Debug
   // Reconfigure alerts to detect frame receive, Bus-Off error and RX queue full states
-  uint32_t alerts_to_enable = TWAI_ALERT_RX_DATA | TWAI_ALERT_ERR_PASS | TWAI_ALERT_BUS_ERROR | TWAI_ALERT_RX_QUEUE_FULL | TWAI_ALERT_BUS_OFF | TWAI_ALERT_TX_FAILED;
+  uint32_t alerts_to_enable = /*TWAI_ALERT_RX_DATA | TWAI_ALERT_ERR_PASS | TWAI_ALERT_BUS_ERROR | TWAI_ALERT_RX_QUEUE_FULL | TWAI_ALERT_BUS_OFF | TWAI_ALERT_TX_FAILED*/TWAI_ALERT_ALL;
 #else
   uint32_t alerts_to_enable = TWAI_ALERT_RX_DATA;
 #endif
-  if (twai_reconfigure_alerts(alerts_to_enable, NULL) == ESP_OK) {
-    Serial.println("CAN Alerts reconfigured");
-  } else {
-    Serial.println("Failed to reconfigure alerts");
-  }
+  ESP_ERROR_CHECK(twai_reconfigure_alerts(alerts_to_enable, NULL));
+  Serial.println("CAN Alerts reconfigured");
 #else
   if (!CAN.begin(500E3)) {
     Serial.println("Starting CAN failed!");
@@ -208,7 +202,6 @@ unsigned int startByteLCD;
 unsigned char checksumLCD, sumLCD;
 
 unsigned long previousMillis = 0;
-int interval = 200;
 bool tx_cycle;
 
 unsigned long previousMillisBLE = 0;
@@ -229,11 +222,14 @@ void loop() {
 #ifdef TWAI
   // Check if alert happened
   uint32_t alerts_triggered;
-  twai_read_alerts(&alerts_triggered, 1);
+  /*ESP_ERROR_CHECK(*/twai_read_alerts(&alerts_triggered, 1)/*)*/;
   twai_status_info_t twaistatus;
-  twai_get_status_info(&twaistatus);
+  ESP_ERROR_CHECK(twai_get_status_info(&twaistatus));
 
   // Handle alerts
+  if (alerts_triggered) {
+/*    Serial.printf("Alert: ");*/
+  }
   if (alerts_triggered & TWAI_ALERT_ERR_PASS) {
     Serial.println("Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: TWAI controller has become error passive.");
   }
@@ -248,10 +244,10 @@ void loop() {
     Serial.printf("Bus error count: %d\n", twaistatus.bus_error_count);
   }
   if (alerts_triggered & TWAI_ALERT_RX_QUEUE_FULL) {
-    Serial.println("Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: The RX queue is full causing a received frame to be lost.");
+/*    Serial.println("Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: Alert: The RX queue is full causing a received frame to be lost.");
     Serial.printf("RX buffered: %d\t", twaistatus.msgs_to_rx);
     Serial.printf("RX missed: %d\t", twaistatus.rx_missed_count);
-    Serial.printf("RX overrun %d\n", twaistatus.rx_overrun_count);
+    Serial.printf("RX overrun %d\n", twaistatus.rx_overrun_count);*/
   }
 
   // Check if message is received
@@ -270,22 +266,41 @@ void loop() {
       /*leds[1] = CRGB::Black;
       FastLED.show();*/
 #ifdef CANSender_Debug
-      Serial.printf("twai_state_t:%i\n", twaistatus.state);
+      switch (twaistatus.state) {
+        case TWAI_STATE_STOPPED: Serial.printf("\tTWAI_STATE_STOPPED\t"); break;
+        case TWAI_STATE_RUNNING: /*Serial.printf("\tTWAI_STATE_RUNNING\t");*/ break;
+        case TWAI_STATE_BUS_OFF: Serial.printf("\tTWAI_STATE_BUS_OFF\t"); break;
+        case TWAI_STATE_RECOVERING: Serial.printf("\tTWAI_STATE_RECOVERING\t"); break;
+        default: Serial.printf("\tTWAI_STATE unknown!\t"); break;
+      }
 #endif
+      //ESP_ERROR_CHECK(twai_clear_transmit_queue());
       //Configure message to transmit
       twai_message_t message;
       message.identifier = 0x09A;
       message.extd = 0;
       message.data_length_code = 1;
-      message.data[0]=0;      
-      if (twai_transmit(&message, pdMS_TO_TICKS(1000)) == ESP_OK) {
+      message.data[0]=0;
+      //message.ss = 1;		//<<<Special mode - Single shot - TX will be attempted only once
+      esp_err_t esp_err;
+      esp_err=twai_transmit(&message, pdMS_TO_TICKS(interval));
+      switch (esp_err) {
+        case  ESP_OK:
+//        ESP_ERROR_CHECK(twai_transmit(&message, pdMS_TO_TICKS(1000)));
 #ifdef ARDUINO_TEmbed
-        leds[1] = tx_cycle ? CRGB::Red : CRGB::Blue;
-        tx_cycle=!tx_cycle;
-        FastLED.show();
+          leds[1] = tx_cycle ? CRGB::Red : CRGB::Blue;
+          tx_cycle=!tx_cycle;
+          FastLED.show();
 #endif
-      } else {
-        Serial.println("Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Failed to queue message for transmission!");
+          break;
+        case ESP_ERR_INVALID_ARG: Serial.println("Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: ESP_ERR_INVALID_ARG!"); break;
+        case ESP_ERR_TIMEOUT: Serial.println("Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: ESP_ERR_TIMEOUT!"); break;
+        case ESP_FAIL: Serial.println("Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: ESP_FAIL!"); break;
+        case ESP_ERR_INVALID_STATE: Serial.println("Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: ESP_ERR_INVALID_STATE!"); break;
+        case ESP_ERR_NOT_SUPPORTED: Serial.println("Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: ESP_ERR_NOT_SUPPORTED!"); break;
+        default: Serial.printf("Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: Error: %i!\n", esp_err); break;
+/*        ESP_ERROR_CHECK(twai_stop());
+        ESP_ERROR_CHECK(twai_start());*/
       }
 #else//def TWAI
       CAN.beginPacket(0x09A);
@@ -331,9 +346,9 @@ void loop() {
 //#endif
   }
 
-  unsigned char inByte;
-#ifdef ARDUINO_M5Stack
+#ifdef TONGSHENG
 if(ATOMCANBusKit) {
+  unsigned char inByte;
   if (Serial2.available()) {
     // Tongsheng motor
     inByte = Serial2.read();
@@ -452,7 +467,9 @@ void onReceive(int packetSize) {
   twai_message_t message;
 while/*if*/ (twai_receive(&message, /*0*/pdMS_TO_TICKS(1)) == ESP_OK) {
     if(message.extd || message.rtr) {
+#ifdef CANSender_Debug
       Serial.println("message.extd || message.rtr");
+#endif
       return;
     }
     packetId=message.identifier;

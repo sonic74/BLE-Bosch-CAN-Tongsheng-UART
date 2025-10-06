@@ -61,8 +61,8 @@ void setup_TEmbed() {
 
 // Pins used to connect to CAN bus transceiver:
 #ifdef TWAI
-#define RX_PIN 43
-#define TX_PIN 44
+RX_PIN=43
+TX_PIN=44
 #else
   CAN.setPins(43, 44);
 #endif

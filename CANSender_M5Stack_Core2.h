@@ -71,8 +71,8 @@ void setup_M5Core2() {
   // G33: RX
   // G32: TX
 #ifdef TWAI
-#define RX_PIN GPIO_NUM_33
-#define TX_PIN GPIO_NUM_32
+RX_PIN=GPIO_NUM_33
+TX_PIN=GPIO_NUM_32
 #else
   CAN.setPins(GPIO_NUM_33, GPIO_NUM_32);
 #endif
