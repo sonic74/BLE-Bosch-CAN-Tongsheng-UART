@@ -1,4 +1,5 @@
 // Bluedroid is incompatible with Garmin
+// "NimBLE-Arduino"
 #include <NimBLEDevice.h>
 //#include <nimble/nimble/host/services/bas/include/services/bas/ble_svc_bas.h>
 

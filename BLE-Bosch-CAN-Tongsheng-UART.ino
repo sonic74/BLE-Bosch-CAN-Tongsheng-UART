@@ -1,10 +1,11 @@
 /* Bosch CAN PowerPack activation and Bosch & Tongsheng TSDZ2 Garmin compatible Bluetooth LE Cycling Power Profile
  *
- * works with esp32 2.0.4
- * worked with M5Stack 2.0.3 & M5Atom 0.0.8 (esp32 1.0.6)
+ * known good dependencies:
+ * esp32 2.0.4
+ * M5Stack 2.0.3 & M5Atom 0.0.8 (esp32 1.0.6)
  *
- * Copyright 2021-2022 Sven Killig (sven@killig.de)
- * http://sven.killig.de/Bosch/CANSender/
+ * Copyright 2021-2025 Sven Killig (sven@killig.de)
+ * https://github.com/sonic74/BLE-Bosch-CAN-Tongsheng-UART
  */
 
 //bool ATOMCANBusKit=false;
@@ -21,7 +22,6 @@ bool tx = true;
 gpio_num_t RX_PIN=GPIO_NUM_NC, TX_PIN=GPIO_NUM_NC;
 #else
 // doesn't build for ARDUINO_M5STACK_ATOMS3
-// https://github.com/sandeepmistry/arduino-CAN
 #include <CAN.h>
 #endif
 
@@ -394,14 +394,14 @@ if(ATOMCANBusKit) {
 }
 #endif // ARDUINO_M5Stack
 
-#ifdef CANSender_Debug
-  /*torque*/powerBio = random(78, 200);
-  cadence = random(1, 90);
-  batteryLevel = random(100);
-#if defined(BLE_server_multiconnect_NimBLE)
-  update_new_rpm(cadence);
-#endif
-#endif
+//#ifdef CANSender_Debug
+//  /*torque*/powerBio = random(78, 200);
+//  cadence = random(1, 90);
+//  batteryLevel = random(100);
+//#if defined(BLE_server_multiconnect_NimBLE)
+//  update_new_rpm(cadence);
+//#endif
+//#endif
 
 #if defined(ARDUINO_TBeam) || defined(ARDUINO_TBEAM_USE_RADIO_SX1262)
   loop_TTBEAM();
