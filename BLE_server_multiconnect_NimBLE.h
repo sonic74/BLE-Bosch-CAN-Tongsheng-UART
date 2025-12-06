@@ -115,8 +115,11 @@ void setup_BLE_server_multiconnect_NimBLE() {
 
   initialize();
 
-  if(ATOMCANBusKit) BLEDevice::init("同盛");
-  else BLEDevice::init("Bosch");
+#ifdef TONGSHENG
+  /*if(ATOMCANBusKit)*/ BLEDevice::init("同盛");
+#else
+  /*else*/ BLEDevice::init("Bosch");
+#endif
 
   // Create the BLE Server
   pServer = BLEDevice::createServer();
@@ -180,8 +183,11 @@ void loop_BLE_server_multiconnect_NimBLE() {
     if (deviceConnected) {
         int torqueCountTemp=torqueCount;
         if(torqueCountTemp>0) {
-          if(ATOMCANBusKit) powerBio=(((float)(torqueSum-78*torqueCount)/(float)torqueCount)*(float)cadence)/(9.55f);
-          else powerBio=(((float)torqueSum/(float)torqueCountTemp)*(float)cadence)/(9.55f*10.0f);
+#ifdef TONGSHENG
+          /*if(ATOMCANBusKit)*/ powerBio=(((float)(torqueSum-78*torqueCount)/(float)torqueCount)*(float)cadence)/(9.55f);
+#else
+          /*else*/ powerBio=(((float)torqueSum/(float)torqueCountTemp)*(float)cadence)/(9.55f*10.0f);
+#endif
           torqueSum=torqueCount=0; // would have to be synchronized
         }
         CPSMeasurement.power=powerBio;
@@ -194,8 +200,11 @@ void loop_BLE_server_multiconnect_NimBLE() {
         pCharacteristic->setValue(reinterpret_cast<uint8_t*>(&CPSMeasurement), sizeof(CPSMeasurement));
         pCharacteristic->notify();
         
-        if(ATOMCANBusKit) pCharacteristicBatteryLevel->setValue((uint8_t)batteryLevel);
-        else pCharacteristicBatteryLevel->setValue((uint8_t)batteryLevel); // todo map()
+#ifdef TONGSHENG
+        /*if(ATOMCANBusKit)*/ pCharacteristicBatteryLevel->setValue((uint8_t)batteryLevel);
+#else
+        /*else*/ pCharacteristicBatteryLevel->setValue((uint8_t)batteryLevel); // todo map()
+#endif
         pCharacteristicBatteryLevel->notify();
         //delay(1000); // bluetooth stack will go into congestion, if too many packets are sent, in 6 hours test i was able to go as low as 3ms
     }

@@ -158,7 +158,7 @@ void setup() {
   // Initialize configuration structures using macro initializers
   twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(TX_PIN, RX_PIN, TWAI_MODE_NORMAL/*TWAI_MODE_NO_ACK*/);
   twai_timing_config_t t_config = TWAI_TIMING_CONFIG_500KBITS();
-  twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL()/*{.acceptance_code = (0x111 << 21),.acceptance_mask = ~(0x7FF << 21),.single_filter = true}*/;
+  twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL()/*{.acceptance_code = (e.g. 0x111 << 21),.acceptance_mask = ~(0x7FF << 21),.single_filter = true}*/;
 
   // Install TWAI driver
   ESP_ERROR_CHECK(twai_driver_install(&g_config, &t_config, &f_config));
@@ -173,8 +173,8 @@ void setup() {
   // Reconfigure alerts to detect frame receive, Bus-Off error and RX queue full states
   uint32_t alerts_to_enable = /*TWAI_ALERT_RX_DATA | TWAI_ALERT_ERR_PASS | TWAI_ALERT_BUS_ERROR | TWAI_ALERT_RX_QUEUE_FULL | TWAI_ALERT_BUS_OFF | TWAI_ALERT_TX_FAILED*/TWAI_ALERT_ALL;
 #else
-  uint32_t alerts_to_enable = TWAI_ALERT_RX_DATA;
-#endif
+  uint32_t alerts_to_enable = TWAI_ALERT_RX_DATA | TWAI_ALERT_RX_QUEUE_FULL;
+#endif // CANSender_Debug
   ESP_ERROR_CHECK(twai_reconfigure_alerts(alerts_to_enable, NULL));
   Serial.println("CAN Alerts reconfigured");
 #else
@@ -185,7 +185,7 @@ void setup() {
 
   // register the receive callback
   CAN.onReceive(onReceive);
-#endif
+#endif // TWAI
   Serial.println("% % | °C °C | W W (= V V x A A) Nm Nm rpm rpm ms ms motorControl W W");
 }
 
@@ -220,7 +220,7 @@ void loop() {
 #ifdef TWAI
   // Check if alert happened
   uint32_t alerts_triggered;
-  /*ESP_ERROR_CHECK(*/twai_read_alerts(&alerts_triggered, 1)/*)*/;
+  /*ESP_ERROR_CHECK(*/twai_read_alerts(&alerts_triggered, /*1*//*pdMS_TO_TICKS(100)*/0)/*)*/;
   twai_status_info_t twaistatus;
   ESP_ERROR_CHECK(twai_get_status_info(&twaistatus));
 
@@ -246,10 +246,11 @@ void loop() {
     Serial.printf("RX buffered: %d\t", twaistatus.msgs_to_rx);
     Serial.printf("RX missed: %d\t", twaistatus.rx_missed_count);
     Serial.printf("RX overrun %d\n", twaistatus.rx_overrun_count);*/
+    Serial.print("R!");
   }
 
   // Check if message is received
-  if (alerts_triggered & TWAI_ALERT_RX_DATA) {
+  if ((alerts_triggered & TWAI_ALERT_RX_DATA) || (alerts_triggered & TWAI_ALERT_RX_QUEUE_FULL)) {
     // One or more messages received. Handle all.
     onReceive(-1);
   }
@@ -392,7 +393,7 @@ if(ATOMCANBusKit) {
     }
   }
 }
-#endif // ARDUINO_M5Stack
+#endif // TONGSHENG
 
 //#ifdef CANSender_Debug
 //  /*torque*/powerBio = random(78, 200);
@@ -463,7 +464,7 @@ void onReceive(int packetSize) {
   int packetId;
 #ifdef TWAI
   twai_message_t message;
-while/*if*/ (twai_receive(&message, /*0*/pdMS_TO_TICKS(1)) == ESP_OK) {
+while/*if*/ (twai_receive(&message, 0/*pdMS_TO_TICKS(1)*/) == ESP_OK) {
     if(message.extd || message.rtr) {
 #ifdef CANSender_Debug
       Serial.println("message.extd || message.rtr");
@@ -502,7 +503,7 @@ while/*if*/ (twai_receive(&message, /*0*/pdMS_TO_TICKS(1)) == ESP_OK) {
 #else
   CAN.readBytes(buffer, packetSize);
   packetId=CAN.packetId();
-#endif
+#endif // TWAI
 #ifdef ARDUINO_M5Stack
 //  if (CAN.packetId() != 0x0E1 && CAN.packetId() != 0x0f1) color.setHSV(map(CAN.packetId(), 0, 0x2aa, 0, 255), 255, 255 * 2 / 3);
 #endif
