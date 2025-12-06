@@ -80,7 +80,7 @@ TX_PIN=GPIO_NUM_32
 
 
 long previousMillisM5Core2=0;
-long intervalM5Core2=1000/60;
+long intervalM5Core2=1000/10;
 void loop_M5Core2() {
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillisM5Core2 >= intervalM5Core2) {
