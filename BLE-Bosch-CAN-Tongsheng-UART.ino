@@ -10,7 +10,7 @@
 
 //bool ATOMCANBusKit=false;
 bool ATOMCANBusKit=true;
-#define CANSender_Debug
+//#define CANSender_Debug
 #define TWAI
 //#define TONGSHENG
 //bool tx = false;
@@ -395,14 +395,14 @@ if(ATOMCANBusKit) {
 }
 #endif // TONGSHENG
 
-//#ifdef CANSender_Debug
+#ifdef CANSender_Debug
 //  /*torque*/powerBio = random(78, 200);
 //  cadence = random(1, 90);
 //  batteryLevel = random(100);
 //#if defined(BLE_server_multiconnect_NimBLE)
 //  update_new_rpm(cadence);
 //#endif
-//#endif
+#endif
 
 #if defined(ARDUINO_TBeam) || defined(ARDUINO_TBEAM_USE_RADIO_SX1262)
   loop_TTBEAM();
@@ -451,7 +451,9 @@ if(ATOMCANBusKit) {
   /*color=!color;
     if(color && tx) M5.dis.drawpix(0, CHSV(0x09A,255,255));
     else M5.dis.clear();*/
+#ifdef CANSender_Debug
   drawpix(0, color);
+#endif
   if (ota) loop_OTAWebUpdater();
 #endif // defined(ARDUINO_M5STACK_Core2) || defined(ARDUINO_M5Stick_C_PLUS) || defined(ARDUINO_M5STACK_ATOMS3)
 }

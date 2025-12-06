@@ -56,7 +56,7 @@ TX_PIN=GPIO_NUM_2;
 
 
 long previousMillisM5AtomS3=0;
-long intervalM5AtomS3=1000/60;
+long intervalM5AtomS3=1000/10;
 enum SCREEN {SCREEN_BATTERY, SCREEN_BIO, SCREEN_TX, SCREEN_OTA, ENUM_LAST};
 SCREEN currentScreen;
 void loop_M5AtomS3() {
