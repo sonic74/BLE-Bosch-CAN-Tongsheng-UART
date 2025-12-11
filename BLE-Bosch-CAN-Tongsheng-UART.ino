@@ -11,8 +11,16 @@
 //bool ATOMCANBusKit=false;
 bool ATOMCANBusKit=true;
 //#define CANSender_Debug
+
+// either Arduino CAN, or:
 #define TWAI
+
+// either Bosch, or:
 //#define TONGSHENG
+
+// either Active/Performance, or (no display yet):
+//#ifdef CLASSIC
+
 //bool tx = false;
 bool tx = true;
 // ################################################################################################################################
@@ -157,7 +165,11 @@ void setup() {
   Serial.printf("TX_PIN=%i, RX_PIN=%i\n", TX_PIN, RX_PIN);
   // Initialize configuration structures using macro initializers
   twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(TX_PIN, RX_PIN, TWAI_MODE_NORMAL/*TWAI_MODE_NO_ACK*/);
+#ifdef CLASSIC
+  twai_timing_config_t t_config = TWAI_TIMING_CONFIG_125KBITS(); // https://www.pedelecforum.de/forum/index.php?threads/classic-can-bus-daten-usw.17799/post-276596
+#else
   twai_timing_config_t t_config = TWAI_TIMING_CONFIG_500KBITS();
+#endif
   twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL()/*{.acceptance_code = (e.g. 0x111 << 21),.acceptance_mask = ~(0x7FF << 21),.single_filter = true}*/;
 
   // Install TWAI driver
@@ -198,7 +210,11 @@ unsigned char checksumMotor, sumMotor;
 unsigned int startByteLCD;
 unsigned char checksumLCD, sumLCD;
 
+#ifdef CLASSIC
+int interval = 500; // https://www.pedelecforum.de/forum/index.php?threads/classic-can-bus-daten-usw.17799/post-565382
+#else
 int interval = 200;
+#endif
 unsigned long previousMillis = 0;
 bool tx_cycle;
 
@@ -276,11 +292,19 @@ void loop() {
       //ESP_ERROR_CHECK(twai_clear_transmit_queue());
       //Configure message to transmit
       twai_message_t message;
-      message.identifier = 0x09A;
+      //message.ss = 1;		//<<<Special mode - Single shot - TX will be attempted only once
       message.extd = 0;
+#ifdef CLASSIC
+      // https://www.pedelecforum.de/forum/index.php?threads/classic-can-bus-daten-usw.17799/post-565261
+      message.identifier = 0x23;
+      message.data_length_code = 8;
+      message.data={0x01, 0x00, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00};
+#else
+      // Active/Performance
+      message.identifier = 0x09A;
       message.data_length_code = 1;
       message.data[0]=0;
-      //message.ss = 1;		//<<<Special mode - Single shot - TX will be attempted only once
+#endif
       esp_err_t esp_err;
       esp_err=twai_transmit(&message, pdMS_TO_TICKS(interval));
       switch (esp_err) {
