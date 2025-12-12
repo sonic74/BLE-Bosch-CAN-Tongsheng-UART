@@ -12,14 +12,14 @@
 bool ATOMCANBusKit=true;
 //#define CANSender_Debug
 
-// either Arduino CAN, or:
+// either Arduino CAN (not for ESP32-S3), or:
 #define TWAI
 
 // either Bosch, or:
 //#define TONGSHENG
 
 // either Active/Performance, or (no display yet):
-//#ifdef CLASSIC
+//#define CLASSIC
 
 //bool tx = false;
 bool tx = true;
@@ -29,7 +29,6 @@ bool tx = true;
 #include "driver/twai.h"
 gpio_num_t RX_PIN=GPIO_NUM_NC, TX_PIN=GPIO_NUM_NC;
 #else
-// doesn't build for ARDUINO_M5STACK_ATOMS3
 #include <CAN.h>
 #endif
 
@@ -298,9 +297,8 @@ void loop() {
       // https://www.pedelecforum.de/forum/index.php?threads/classic-can-bus-daten-usw.17799/post-565261
       message.identifier = 0x23;
       message.data_length_code = 8;
-      message.data={0x01, 0x00, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00};
+      message.data[0]=0x01; message.data[1]=0x00; message.data[2]=0x64; message.data[3]=0x00; message.data[4]=0x00; message.data[5]=0x00; message.data[6]=0x00; message.data[7]=0x00;
 #else
-      // Active/Performance
       message.identifier = 0x09A;
       message.data_length_code = 1;
       message.data[0]=0;
